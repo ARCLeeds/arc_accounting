@@ -199,7 +199,7 @@ CREATE TABLE job_to_mpirun(
 );
 CREATE UNIQUE INDEX job_mpirun on job_to_mpirun (jobid, mpirunid);
 
-- Job to module mapping (many-to-many)
+-- Job to module mapping (many-to-many)
 CREATE TABLE job_to_module(
    jobid BIGINT UNSIGNED NOT NULL,
    moduleid MEDIUMINT UNSIGNED NOT NULL
