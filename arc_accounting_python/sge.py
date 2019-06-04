@@ -203,12 +203,12 @@ def dbrecords(db, service, filter_spec=None, fields=('*', ), modify=None):
    values = [ serviceid, serviceid ]
    for sp in filter_spec:
       for f, act in sp.items():
-         if act == '==':
-            conj = " OR "
-         else:
-            conj = " AND "
-
          for op, vals in act.items():
+            if op == '==' or op == '=':
+               conj = " OR "
+            else:
+               conj = " AND "
+
             values.extend(vals)
             where.append("("+ conj.join([f +" "+ op + " %s"]*len(vals)) +")")
 
@@ -397,12 +397,14 @@ def dbavail(db, service, start, end, queues, skipqueues):
    if queues:
       select += " AND ("
 
-      for q in enumerate(queues):
-         queueid = dbgetfield(db, "SELECT id FROM queues WHERE serviceid = %s AND name = %s", (serviceid, q[1]))
+      num = 0
+      for q in queues:
+         queueid = dbgetfield(db, "SELECT id FROM queues WHERE serviceid = %s AND name = %s", (serviceid, q))
          if queueid:
-            if q[0] > 0: select += " OR "
+            if num > 0: select += " OR "
             select += "queueid = %s"
             data.append(queueid)
+            num = num +1
 
       select += ")"
 

@@ -60,6 +60,8 @@ parser.add_argument('--byapp', action='store_true', default=False, help="Report 
 parser.add_argument('--byjob', action='store_true', default=False, help="Report on individual jobs")
 parser.add_argument('--coprocstats', action='store_true', default=False, help="Add coproc statistics to reports")
 parser.add_argument('--availstats', action='store_true', default=False, help="Add core hour availability statistics to reports")
+parser.add_argument('--waitstats', action='store_true', default=False, help="Add wait statistics to reports")
+parser.add_argument('--basicwaittime', action='store_true', default=False, help="Use simple wait time measure (time submit/start instead of submit/end)")
 
 args = parser.parse_args()
 
@@ -245,6 +247,7 @@ def main():
          'owner',
          'project',
          'maxvmem',
+         'start_time',
          'end_time',
          'ru_wallclock',
          'category',
@@ -482,7 +485,10 @@ def process_raw(record, projusers, sizebins):
    projusers[project][user]['mem_req_hours'] += record['core_hours'] * record['mem_req']
 
    # - count wait time
-   projusers[project][user]['wait_hours'] += max((record['end_time'] - record['submission_time']) / float(3600), 0)
+   if args.basicwaittime:
+      projusers[project][user]['wait_hours'] += max((record['start_time'] - record['submission_time']) / float(3600), 0)
+   else:
+      projusers[project][user]['wait_hours'] += max((record['end_time'] - record['submission_time']) / float(3600), 0)
 
    # - count wallclock time
    projusers[project][user]['wall_hours'] += record['ru_wallclock'] / float(3600)
@@ -646,6 +652,7 @@ def return_size_adj(record):
 def summarise_totalsbydate(data, bins):
    headers = [ 'Date', 'Parents', 'Projects', 'Users', 'Jobs', 'Core Hrs', 'Adj Core Hrs' ]
    if args.availstats: headers.extend(['%Avl', '%Utl'])
+   if args.waitstats: headers.extend(['Wait Hrs/Jobs'])
    headers.extend([ 'Core Hrs/Wait', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ])
    if args.coprocstats: headers.extend(['Coproc %Eff', 'Coproc Mem %Eff'])
    if bins: headers.extend([b['name'] for b in bins])
@@ -708,6 +715,7 @@ def summarise_totalsbydate(data, bins):
          'Adj Core Hrs': sum([d['projects'][p]['core_hours_adj'] for p in d['projects']]),
          '%Avl': percent(sum([d['projects'][p]['core_hours_adj'] for p in d['projects']]), d['date']['core_hours']),
          '%Utl': percent(sum([d['projects'][p]['core_hours_adj'] for p in d['projects']]), d['date']['max_core_hours']),
+         'Wait Hrs/Jobs': div(wait_hours, sum([d['projects'][p]['jobs'] for p in d['projects']])),
          'Core Hrs/Wait': div(core_hours_adj, wait_hours),
          'Wall %Acc': percent(wall_req_hours,  wall_hours),
          'Core %Eff': percent(cpu_hours,  core_hours_adj),
@@ -727,6 +735,7 @@ def summarise_totalsbydate(data, bins):
       'Adj Core Hrs': sum_key(table, 'Adj Core Hrs'),
       '%Avl': percent(sum_key(table, 'Adj Core Hrs'), avail_core_hours),
       '%Utl': percent(sum_key(table, 'Adj Core Hrs'), max_core_hours),
+      'Wait Hrs/Jobs': div(total_wait_hours, sum_key(table, 'Jobs')),
       'Core Hrs/Wait': div(sum_key(table, 'Adj Core Hrs'), total_wait_hours),
       'Wall %Acc': percent(total_wall_req_hours, total_wall_hours),
       'Core %Eff': percent(total_cpu_hours, sum_key(table, 'Adj Core Hrs')),
@@ -742,6 +751,7 @@ def summarise_totalsbydate(data, bins):
 def summarise_parentsbydate(data, parent, bins):
    headers = [ 'Date', 'Users', 'Jobs', 'Core Hrs', 'Adj Core Hrs', '%Usg' ]
    if args.availstats: headers.extend(['%Avl', '%Utl'])
+   if args.waitstats: headers.extend(['Wait Hrs/Jobs'])
    headers.extend([ 'Core Hrs/Wait', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ])
    if args.coprocstats: headers.extend(['Coproc %Eff', 'Coproc Mem %Eff'])
    if bins: headers.extend([b['name'] for b in bins])
@@ -791,6 +801,7 @@ def summarise_parentsbydate(data, parent, bins):
             '%Usg': percent(d['parents'][parent]['core_hours_adj'], core_hours_adj),
             '%Avl': percent(d['parents'][parent]['core_hours_adj'], d['date']['core_hours']),
             '%Utl': percent(d['parents'][parent]['core_hours_adj'], d['date']['max_core_hours']),
+            'Wait Hrs/Jobs': div(d['parents'][parent]['wait_hours'], d['parents'][parent]['jobs']),
             'Core Hrs/Wait': div(d['parents'][parent]['core_hours_adj'], d['parents'][parent]['wait_hours']),
             'Wall %Acc': percent(d['parents'][parent]['wall_req_hours'], d['parents'][parent]['wall_hours']),
             'Core %Eff': percent(d['parents'][parent]['cpu_hours'], d['parents'][parent]['core_hours_adj']),
@@ -809,6 +820,7 @@ def summarise_parentsbydate(data, parent, bins):
             '%Usg': percent(0, 0),
             '%Avl': percent(0, 0),
             '%Utl': percent(0, 0),
+            'Wait Hrs/Jobs': 0,
             'Core Hrs/Wait': 0,
             'Wall %Acc': percent(0, 0),
             'Core %Eff': percent(0, 0),
@@ -827,6 +839,7 @@ def summarise_parentsbydate(data, parent, bins):
       '%Usg': percent(sum_key(table, 'Adj Core Hrs'), total_core_hours_adj),
       '%Avl': percent(sum_key(table, 'Adj Core Hrs'), avail_core_hours),
       '%Utl': percent(sum_key(table, 'Adj Core Hrs'), max_core_hours),
+      'Wait Hrs/Jobs': div(total_wait_hours, sum_key(table, 'Jobs')),
       'Core Hrs/Wait': div(sum_key(table, 'Adj Core Hrs'), total_wait_hours),
       'Wall %Acc': percent(total_wall_req_hours, total_wall_hours),
       'Core %Eff': percent(total_cpu_hours, sum_key(table, 'Adj Core Hrs')),
@@ -842,6 +855,7 @@ def summarise_parentsbydate(data, parent, bins):
 def summarise_projectsbydate(data, project, bins):
    headers = [ 'Date', 'Users', 'Jobs', 'Core Hrs', 'Adj Core Hrs', '%Usg' ]
    if args.availstats: headers.extend(['%Avl', '%Utl'])
+   if args.waitstats: headers.extend(['Wait Hrs/Jobs'])
    headers.extend([ 'Core Hrs/Wait', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ])
    if args.coprocstats: headers.extend(['Coproc %Eff', 'Coproc Mem %Eff'])
    if bins: headers.extend([b['name'] for b in bins])
@@ -891,6 +905,7 @@ def summarise_projectsbydate(data, project, bins):
             '%Usg': percent(d['projects'][project]['core_hours_adj'], core_hours_adj),
             '%Avl': percent(d['projects'][project]['core_hours_adj'], d['date']['core_hours']),
             '%Utl': percent(d['projects'][project]['core_hours_adj'], d['date']['max_core_hours']),
+            'Wait Hrs/Jobs': div(d['projects'][project]['wait_hours'], d['projects'][project]['jobs']),
             'Core Hrs/Wait': div(d['projects'][project]['core_hours_adj'], d['projects'][project]['wait_hours']),
             'Wall %Acc': percent(d['projects'][project]['wall_req_hours'], d['projects'][project]['wall_hours']),
             'Core %Eff': percent(d['projects'][project]['cpu_hours'], d['projects'][project]['core_hours_adj']),
@@ -909,6 +924,7 @@ def summarise_projectsbydate(data, project, bins):
             '%Usg': percent(0, 0),
             '%Avl': percent(0, 0),
             '%Utl': percent(0, 0),
+            'Wait Hrs/Jobs': 0,
             'Core Hrs/Wait': 0,
             'Wall %Acc': percent(0, 0),
             'Core %Eff': percent(0, 0),
@@ -927,6 +943,7 @@ def summarise_projectsbydate(data, project, bins):
       '%Usg': percent(sum_key(table, 'Adj Core Hrs'), total_core_hours_adj),
       '%Avl': percent(sum_key(table, 'Adj Core Hrs'), avail_core_hours),
       '%Utl': percent(sum_key(table, 'Adj Core Hrs'), max_core_hours),
+      'Wait Hrs/Jobs': div(total_wait_hours, sum_key(table, 'Jobs')),
       'Core Hrs/Wait': div(sum_key(table, 'Adj Core Hrs'), total_wait_hours),
       'Wall %Acc': percent(total_wall_req_hours, total_wall_hours),
       'Core %Eff': percent(total_cpu_hours, sum_key(table, 'Adj Core Hrs')),
@@ -942,6 +959,7 @@ def summarise_projectsbydate(data, project, bins):
 def summarise_usersbydate(data, user, bins):
    headers = [ 'Date', 'Jobs', 'Core Hrs', 'Adj Core Hrs', '%Usg' ]
    if args.availstats: headers.extend(['%Avl', '%Utl'])
+   if args.waitstats: headers.extend(['Wait Hrs/Jobs'])
    headers.extend([ 'Core Hrs/Wait', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ])
    if args.coprocstats: headers.extend(['Coproc %Eff', 'Coproc Mem %Eff'])
    if bins: headers.extend([b['name'] for b in bins])
@@ -990,6 +1008,7 @@ def summarise_usersbydate(data, user, bins):
             '%Usg': percent(d['users'][user]['core_hours_adj'], core_hours_adj),
             '%Avl': percent(d['users'][user]['core_hours_adj'], d['date']['core_hours']),
             '%Utl': percent(d['users'][user]['core_hours_adj'], d['date']['max_core_hours']),
+            'Wait Hrs/Jobs': div(d['users'][user]['wait_hours'], d['users'][user]['jobs']),
             'Core Hrs/Wait': div(d['users'][user]['core_hours_adj'], d['users'][user]['wait_hours']),
             'Wall %Acc': percent(d['users'][user]['wall_req_hours'], d['users'][user]['wall_hours']),
             'Core %Eff': percent(d['users'][user]['cpu_hours'], d['users'][user]['core_hours_adj']),
@@ -1007,6 +1026,7 @@ def summarise_usersbydate(data, user, bins):
             '%Usg': percent(0, 0),
             '%Avl': percent(0, 0),
             '%Utl': percent(0, 0),
+            'Wait Hrs/Jobs': 0,
             'Core Hrs/Wait': 0,
             'Wall %Acc': percent(0, 0),
             'Core %Eff': percent(0, 0),
@@ -1024,6 +1044,7 @@ def summarise_usersbydate(data, user, bins):
       '%Usg': percent(sum_key(table, 'Adj Core Hrs'), total_core_hours_adj),
       '%Avl': percent(sum_key(table, 'Adj Core Hrs'), avail_core_hours),
       '%Utl': percent(sum_key(table, 'Adj Core Hrs'), max_core_hours),
+      'Wait Hrs/Jobs': div(total_wait_hours, sum_key(table, 'Jobs')),
       'Core Hrs/Wait': div(sum_key(table, 'Adj Core Hrs'), total_wait_hours),
       'Wall %Acc': percent(total_wall_req_hours, total_wall_hours),
       'Core %Eff': percent(total_cpu_hours, sum_key(table, 'Adj Core Hrs')),
@@ -1039,6 +1060,7 @@ def summarise_usersbydate(data, user, bins):
 def summarise_parents(data, bins):
    headers = [ 'Parent', 'Users', 'Jobs', 'Core Hrs', 'Adj Core Hrs', '%Usg' ]
    if args.availstats: headers.extend(['%Avl', '%Utl'])
+   if args.waitstats: headers.extend(['Wait Hrs/Jobs'])
    headers.extend([ 'Core Hrs/Wait', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ])
    if args.coprocstats: headers.extend(['Coproc %Eff', 'Coproc Mem %Eff'])
    if bins: headers.extend([b['name'] for b in bins])
@@ -1056,6 +1078,7 @@ def summarise_parents(data, bins):
          '%Usg': percent(d['core_hours_adj'], core_hours_adj),
          '%Avl': percent(d['core_hours_adj'], data['date']['core_hours']),
          '%Utl': percent(d['core_hours_adj'], data['date']['max_core_hours']),
+         'Wait Hrs/Jobs': div(d['wait_hours'], d['jobs']),
          'Core Hrs/Wait': div(d['core_hours_adj'], d['wait_hours']),
          'Wall %Acc': percent(d['wall_req_hours'], d['wall_hours']),
          'Core %Eff': percent(d['cpu_hours'], d['core_hours_adj']),
@@ -1074,6 +1097,7 @@ def summarise_parents(data, bins):
       '%Usg': percent(sum_key(table, 'Adj Core Hrs'), core_hours_adj),
       '%Avl': percent(sum_key(table, 'Adj Core Hrs'), data['date']['core_hours']),
       '%Utl': percent(sum_key(table, 'Adj Core Hrs'), data['date']['max_core_hours']),
+      'Wait Hrs/Jobs': div(sum([data['parents'][p]['wait_hours'] for p in data['parents']]), sum_key(table, 'Jobs')),
       'Core Hrs/Wait': div(sum_key(table, 'Adj Core Hrs'), sum([data['parents'][p]['wait_hours'] for p in data['parents']])),
       'Wall %Acc': percent(sum([data['parents'][p]['wall_req_hours'] for p in data['parents']]), sum([data['parents'][p]['wall_hours'] for p in data['parents']])),
       'Core %Eff': percent(sum([data['parents'][p]['cpu_hours'] for p in data['parents']]), sum_key(table, 'Adj Core Hrs')),
@@ -1089,6 +1113,7 @@ def summarise_parents(data, bins):
 def summarise_projects(data, bins):
    headers = [ 'Project', 'Parent', 'Users', 'Jobs', 'Core Hrs', 'Adj Core Hrs', '%Usg' ]
    if args.availstats: headers.extend(['%Avl', '%Utl'])
+   if args.waitstats: headers.extend(['Wait Hrs/Jobs'])
    headers.extend([ 'Core Hrs/Wait', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ])
    if args.coprocstats: headers.extend(['Coproc %Eff', 'Coproc Mem %Eff'])
    if bins: headers.extend([b['name'] for b in bins])
@@ -1107,6 +1132,7 @@ def summarise_projects(data, bins):
          '%Usg': percent(d['core_hours_adj'], core_hours_adj),
          '%Avl': percent(d['core_hours_adj'], data['date']['core_hours']),
          '%Utl': percent(d['core_hours_adj'], data['date']['max_core_hours']),
+         'Wait Hrs/Jobs': div(d['wait_hours'], d['jobs']),
          'Core Hrs/Wait': div(d['core_hours_adj'], d['wait_hours']),
          'Wall %Acc': percent(d['wall_req_hours'], d['wall_hours']),
          'Core %Eff': percent(d['cpu_hours'], d['core_hours_adj']),
@@ -1126,6 +1152,7 @@ def summarise_projects(data, bins):
       '%Usg': percent(sum_key(table, 'Adj Core Hrs'), core_hours_adj),
       '%Avl': percent(sum_key(table, 'Adj Core Hrs'), data['date']['core_hours']),
       '%Utl': percent(sum_key(table, 'Adj Core Hrs'), data['date']['max_core_hours']),
+      'Wait Hrs/Jobs': div(sum([data['projects'][p]['wait_hours'] for p in data['projects']]), sum_key(table, 'Jobs')),
       'Core Hrs/Wait': div(sum_key(table, 'Adj Core Hrs'), sum([data['projects'][p]['wait_hours'] for p in data['projects']])),
       'Wall %Acc': percent(sum([data['projects'][p]['wall_req_hours'] for p in data['projects']]), sum([data['projects'][p]['wall_hours'] for p in data['projects']])),
       'Core %Eff': percent(sum([data['projects'][p]['cpu_hours'] for p in data['projects']]), sum_key(table, 'Adj Core Hrs')),
@@ -1141,6 +1168,7 @@ def summarise_projects(data, bins):
 def summarise_users(data, bins):
    headers = [ 'Usr', 'Project(s)', 'Jobs', 'Core Hrs', 'Adj Core Hrs', '%Usg' ]
    if args.availstats: headers.extend(['%Avl', '%Utl'])
+   if args.waitstats: headers.extend(['Wait Hrs/Jobs'])
    headers.extend([ 'Core Hrs/Wait', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ])
    if args.coprocstats: headers.extend(['Coproc %Eff', 'Coproc Mem %Eff'])
    if bins: headers.extend([b['name'] for b in bins])
@@ -1161,6 +1189,7 @@ def summarise_users(data, bins):
          '%Usg': percent(d['core_hours_adj'], core_hours_adj),
          '%Avl': percent(d['core_hours_adj'], data['date']['core_hours']),
          '%Utl': percent(d['core_hours_adj'], data['date']['max_core_hours']),
+         'Wait Hrs/Jobs': div(d['wait_hours'], d['jobs']),
          'Core Hrs/Wait': div(d['core_hours_adj'], d['wait_hours']),
          'Wall %Acc': percent(d['wall_req_hours'], d['wall_hours']),
          'Core %Eff': percent(d['cpu_hours'], d['core_hours_adj']),
@@ -1179,6 +1208,7 @@ def summarise_users(data, bins):
       '%Usg': percent(sum_key(table, 'Adj Core Hrs'), core_hours_adj),
       '%Avl': percent(sum_key(table, 'Adj Core Hrs'), data['date']['core_hours']),
       '%Utl': percent(sum_key(table, 'Adj Core Hrs'), data['date']['max_core_hours']),
+      'Wait Hrs/Jobs': div(sum([data['users'][u]['wait_hours'] for u in data['users']]), sum_key(table, 'Jobs')),
       'Core Hrs/Wait': div(sum_key(table, 'Adj Core Hrs'), sum([data['users'][u]['wait_hours'] for u in data['users']])),
       'Wall %Acc': percent(sum([data['users'][u]['wall_req_hours'] for u in data['users']]), sum([data['users'][u]['wall_hours'] for u in data['users']])),
       'Core %Eff': percent(sum([data['users'][u]['cpu_hours'] for u in data['users']]), sum_key(table, 'Adj Core Hrs')),
@@ -1193,6 +1223,7 @@ def summarise_users(data, bins):
 def summarise_project(data, project, bins):
    headers = [ 'Usr', 'Jobs', 'Core Hrs', 'Adj Core Hrs', '%Usg' ]
    if args.availstats: headers.extend(['%Avl', '%Utl'])
+   if args.waitstats: headers.extend(['Wait Hrs/Jobs'])
    headers.extend([ 'Core Hrs/Wait', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ])
    if args.coprocstats: headers.extend(['Coproc %Eff', 'Coproc Mem %Eff'])
    if bins: headers.extend([b['name'] for b in bins])
@@ -1212,6 +1243,7 @@ def summarise_project(data, project, bins):
          '%Usg': percent(d['core_hours_adj'], core_hours_adj),
          '%Avl': percent(d['core_hours_adj'], data['date']['core_hours']),
          '%Utl': percent(d['core_hours_adj'], data['date']['max_core_hours']),
+         'Wait Hrs/Jobs': div(d['wait_hours'], d['jobs']),
          'Core Hrs/Wait': div(d['core_hours_adj'], d['wait_hours']),
          'Wall %Acc': percent(d['wall_req_hours'], d['wall_hours']),
          'Core %Eff': percent(d['cpu_hours'], d['core_hours_adj']),
@@ -1229,6 +1261,7 @@ def summarise_project(data, project, bins):
       '%Usg': percent(sum_key(table, 'Adj Core Hrs'), core_hours_adj),
       '%Avl': percent(sum_key(table, 'Adj Core Hrs'), data['date']['core_hours']),
       '%Utl': percent(sum_key(table, 'Adj Core Hrs'), data['date']['max_core_hours']),
+      'Wait Hrs/Jobs': div(sum([data['projusers'][project][u]['wait_hours'] for u in data['projusers'][project]]), sum_key(table, 'Jobs')),
       'Core Hrs/Wait': div(sum_key(table, 'Adj Core Hrs'), sum([data['projusers'][project][u]['wait_hours'] for u in data['projusers'][project]])),
       'Wall %Acc': percent(sum([data['projusers'][project][u]['wall_req_hours'] for u in data['projusers'][project]]), sum([data['projusers'][project][u]['wall_hours'] for u in data['projusers'][project]])),
       'Core %Eff': percent(sum([data['projusers'][project][u]['cpu_hours'] for u in data['projusers'][project]]), sum_key(table, 'Adj Core Hrs')),
@@ -1279,6 +1312,8 @@ def print_summary(data, reports, bins):
    if args.availstats:
       print("- %Avl: proportion of available core hours")
       print("- %Utl: proportion of max possible core hours")
+   if args.waitstats:
+      print("- Wait Hrs/Jobs: sum(queuing hours) / num jobs)")
    print("- Core Hrs/Wait: sum(adj core hours) / sum(elapsed hours from submit to finish)")
    print("- Wall %Acc: accuracy of user h_rt request (100% == perfect, 200% == used half requested time)")
    print("- %Eff: efficiency - how much of a allocated resource was actually used")
