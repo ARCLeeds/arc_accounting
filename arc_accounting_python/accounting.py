@@ -62,6 +62,7 @@ parser.add_argument('--coprocstats', action='store_true', default=False, help="A
 parser.add_argument('--availstats', action='store_true', default=False, help="Add core hour availability statistics to reports")
 parser.add_argument('--waitstats', action='store_true', default=False, help="Add wait statistics to reports")
 parser.add_argument('--basicwaittime', action='store_true', default=False, help="Use simple wait time measure (time submit/start instead of submit/end)")
+parser.add_argument('--cpuspercpu', action='store', default=1, type=int, help="Number of actual CPUs per CPU measured by the accounting data")
 
 args = parser.parse_args()
 
@@ -602,8 +603,8 @@ def record_modify(record):
    else:
       size_adj = return_size_adj(record)
 
-   record['job_size'] = record['slots']
-   record['job_size_adj'] = record['slots'] * size_adj
+   record['job_size'] = record['slots'] * args.cpuspercpu
+   record['job_size_adj'] = record['job_size'] * size_adj
 
    record['core_hours'] = record['ru_wallclock'] * record['job_size'] / float(3600)
    record['core_hours_adj'] = record['ru_wallclock'] * record['job_size_adj'] / float(3600)
