@@ -95,6 +95,9 @@ backup_node_mpc = [
    { 'regex': r"^g[0-9]s",    'mpc': sge.number("64G") // 16 }, # POLARIS/ARC2
    { 'regex': r"^hb01s",      'mpc': sge.number("256G") // 20 }, # MARC1
    { 'regex': r"^hb02n",      'mpc': sge.number("3T") // 48 }, # MARC1
+   { 'regex': r"^(comp|sky|env)", 'mpc': sge.number("2G") }, # EVEREST
+   { 'regex': r"^vizcomp",    'mpc': sge.number("1G") }, # EVEREST
+   { 'regex': r"^cloud",      'mpc': sge.number("4G") }, # EVEREST
 ]
 
 # Compile regexes
