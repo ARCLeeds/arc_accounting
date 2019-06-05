@@ -439,6 +439,9 @@ def main():
    # Spit out answer
    print_summary(data, args.reports, sizebins)
 
+   # Return main data structure, in case we using this interactively
+   return(data)
+
 
 def process_raw(record, projusers, sizebins):
    user = record['owner']
