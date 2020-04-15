@@ -2,6 +2,8 @@
 
 import os
 import re
+import sys
+import syslog
 
 # DEBUG:
 # - each regex definition should just be in the scope of, and near to,
@@ -114,70 +116,72 @@ def records(accounting = None,
       f = accounting
 
    for line in f:
-      r = record_def.match(line)
-      if r:
-         d = r.groupdict()
-
-         # Create a combined job/task name
-         d['name'] = d['job_number'] + "." + ('1' if d['task_number'] == '0' else d['task_number'])
-
-         # Prune DNS domainname (most SGE installations are domainname-insensitive)
-         d['hostname'] = host_prune.match(d['hostname']).group()
-
-         # Convert integer fields from strings to integers
-         for f in [
-                     'job_number',
-                     'submission_time',
-                     'start_time',
-                     'end_time',
-                     'failed',
-                     'exit_status',
-                     'slots',
-                     'task_number',
-                     'arid',
-                     'ar_sub_time',
-                  ]:
-            d[f] = int(d[f])
-
-         # Convert float fields from strings to floats
-         for f in [
-                     'priority',
-                     'ru_wallclock',
-                     'ru_utime',
-                     'ru_stime',
-                     'ru_maxrss',
-                     'ru_ixrss',
-                     'ru_ismrss',
-                     'ru_idrss',
-                     'ru_isrss',
-                     'ru_minflt',
-                     'ru_majflt',
-                     'ru_nswap',
-                     'ru_inblock',
-                     'ru_oublock',
-                     'ru_msgsnd',
-                     'ru_msgrcv',
-                     'ru_nsignals',
-                     'ru_nvcsw',
-                     'ru_nivcsw',
-                     'cpu',
-                     'mem',
-                     'io',
-                     'iow',
-                     'maxvmem',
-                  ]:
-            d[f] = float(d[f])
-
-         # Modify record, e.g. add extra fields
-         if modify: modify(d)
-
-         # Filter out undesirable records
-         if filter:
-            if not filter(d): continue
-
-         # Return record
-         yield(d)
-
+      try:
+         r = record_def.match(line)
+         if r:
+            d = r.groupdict()
+ 
+            # Create a combined job/task name
+            d['name'] = d['job_number'] + "." + ('1' if d['task_number'] == '0' else d['task_number'])
+ 
+            # Prune DNS domainname (most SGE installations are domainname-insensitive)
+            d['hostname'] = host_prune.match(d['hostname']).group()
+ 
+            # Convert integer fields from strings to integers
+            for f in [
+                        'job_number',
+                        'submission_time',
+                        'start_time',
+                        'end_time',
+                        'failed',
+                        'exit_status',
+                        'slots',
+                        'task_number',
+                        'arid',
+                        'ar_sub_time',
+                     ]:
+               d[f] = int(d[f])
+ 
+            # Convert float fields from strings to floats
+            for f in [
+                        'priority',
+                        'ru_wallclock',
+                        'ru_utime',
+                        'ru_stime',
+                        'ru_maxrss',
+                        'ru_ixrss',
+                        'ru_ismrss',
+                        'ru_idrss',
+                        'ru_isrss',
+                        'ru_minflt',
+                        'ru_majflt',
+                        'ru_nswap',
+                        'ru_inblock',
+                        'ru_oublock',
+                        'ru_msgsnd',
+                        'ru_msgrcv',
+                        'ru_nsignals',
+                        'ru_nvcsw',
+                        'ru_nivcsw',
+                        'cpu',
+                        'mem',
+                        'io',
+                        'iow',
+                        'maxvmem',
+                     ]:
+               d[f] = float(d[f])
+ 
+            # Modify record, e.g. add extra fields
+            if modify: modify(d)
+ 
+            # Filter out undesirable records
+            if filter:
+               if not filter(d): continue
+ 
+            # Return record
+            yield(d)
+      except:
+         syslog.syslog("Failed to process one record" + str(sys.exc_info()))
 
 # Generator
 # Walks all accounting records, returning a dictionary per record
