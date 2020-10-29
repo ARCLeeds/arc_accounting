@@ -85,6 +85,17 @@ max_num = sys.maxsize -1
 # Backup method of determining node memory per core (mpc), in absence of
 # node_type in job record, from hostname
 backup_node_mpc = [
+   { 'regex': r"^d[8-9]s", 'mpc': sge.number("192G") // 40 }, # ARC4
+   { 'regex': r"^d1[0-2]s", 'mpc': sge.number("192G") // 40 }, # ARC4
+   { 'regex': r"^data", 'mpc': sge.number("192G") // 16 }, # ARC4
+   { 'regex': r"^d8mem", 'mpc': sge.number("768G") // 40 }, # ARC4
+   { 'regex': r"^db0[4-5]gpu", 'mpc': sge.number("192G") // 40 }, # ARC4
+   { 'regex': r"^db12gpu[1-2]", 'mpc': sge.number("128G") // 24 }, # ARC3
+   { 'regex': r"^db12gpu[3-9]", 'mpc': sge.number("256G") // 24 }, # ARC3
+   { 'regex': r"^db12gpu1[0-2]", 'mpc': sge.number("256G") // 24 }, # ARC3
+   { 'regex': r"^db12gpu13", 'mpc': sge.number("512G") // 24 }, # ARC3
+   { 'regex': r"^db12phi", 'mpc': sge.number("112G") // 256 }, # ARC3
+   { 'regex': r"^db12mem", 'mpc': sge.number("768G") // 24 }, # ARC3
    { 'regex': r"^h7s3b1[56]", 'mpc': sge.number("64G") // 24 }, # ARC2
    { 'regex': r"^h[12367]s",  'mpc': sge.number("24G") // 12 }, # ARC2
    { 'regex': r"^dc[1-4]s",   'mpc': sge.number("128G") // 24 }, # ARC3
